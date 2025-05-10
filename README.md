@@ -1,6 +1,6 @@
 <sup>In memory of Pizzavu</sup>
 # godot-(mis)adventures
-What follows is my past works and projects that I have done with Godot engine. Most if not all of these are unfinished, but perhaps you may find usefulness within them. A special thanks to the Godot community and Github for making all of this possible. 
+What follows is my past works and projects that I have done with Godot engine. Most if not all of these are unfinished, but perhaps you may find usefulness within them. A special thanks to the Godot community and Github for making all of this possible, and cooliecat for all the helpful feedback throughout my coding endeavours.
 ## Licenses
 ### MIT
 ALL files with the following extensions are released with the [MIT](https://github.com/boniondev/godot-misadventures/blob/main/LICENSE-MIT) license:
