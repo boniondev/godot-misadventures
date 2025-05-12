@@ -24,5 +24,6 @@ I didn't exactly learn that much regarding making games by working on this, but 
 
 > [!TIP]
 > By downloading the 2playershumptest folder, you should be able to import it as a Godot project and run it out of the box without issues. Connecting to yourself should work fine.
+
 > [!WARNING]
 > Running the project creates a *lot* of of logs inside Appdata/Roaming/Godot/app_userdata/2playershumptest.
