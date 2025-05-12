@@ -1,0 +1,40 @@
+[gd_scene load_steps=4 format=3 uid="uid://bfeoh8ieitlx2"]
+
+[ext_resource type="PackedScene" uid="uid://dsf5owtkvue8q" path="res://bullet.tscn" id="1_onrkg"]
+[ext_resource type="Texture2D" uid="uid://gmtw3l687hfy" path="res://icon.svg" id="2_i3pqv"]
+
+[sub_resource type="GDScript" id="GDScript_10860"]
+resource_name = "playerscript"
+script/source = "extends CharacterBody2D
+
+
+@export var speed : int = 100
+@export var bullet : PackedScene
+var time : int = Time.get_ticks_msec()
+signal movement_change
+signal shot
+
+func _physics_process(delta: float) -> void:
+	var inputdirection = Input.get_vector(\"move_left\",\"move_right\",\"move_up\",\"move_down\")
+	if inputdirection.x != 0 or inputdirection.y != 0:
+		movement_change.emit()
+	velocity = inputdirection * speed
+	if Input.is_action_pressed(\"shoot\"):
+		if Time.get_ticks_msec() - time > 100:
+			var newbullet = bullet.instantiate()
+			newbullet.init(self.transform, self.global_position)
+			owner.add_child(newbullet)
+			shot.emit()
+			time = Time.get_ticks_msec()
+	move_and_slide()
+"
+
+[node name="Player" type="CharacterBody2D"]
+rotation = -1.5708
+motion_mode = 1
+script = SubResource("GDScript_10860")
+bullet = ExtResource("1_onrkg")
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+scale = Vector2(0.25, 0.25)
+texture = ExtResource("2_i3pqv")

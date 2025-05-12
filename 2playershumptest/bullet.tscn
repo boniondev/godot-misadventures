@@ -1,0 +1,26 @@
+[gd_scene load_steps=3 format=3 uid="uid://dsf5owtkvue8q"]
+
+[ext_resource type="Texture2D" uid="uid://gmtw3l687hfy" path="res://icon.svg" id="1_2sfe8"]
+
+[sub_resource type="GDScript" id="GDScript_hiuga"]
+resource_name = "bulletmovementlogic"
+script/source = "extends Area2D
+
+const speed = 100
+
+
+func _physics_process(delta: float) -> void:
+	self.position = self.position + transform.x * (speed * 0.5)
+
+
+func init(owner_transform : Transform2D, owner_global_pos : Vector2):
+	self.transform = owner_transform
+	self.global_position = owner_global_pos
+"
+
+[node name="Area2D" type="Area2D"]
+script = SubResource("GDScript_hiuga")
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+scale = Vector2(0.25, 0.1)
+texture = ExtResource("1_2sfe8")

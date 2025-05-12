@@ -1,0 +1,308 @@
+[gd_scene load_steps=4 format=3 uid="uid://c5n4aynfmjfs2"]
+
+[ext_resource type="PackedScene" uid="uid://bfeoh8ieitlx2" path="res://player.tscn" id="1_0fbet"]
+[ext_resource type="PackedScene" uid="uid://fdodxa6ptw0p" path="res://playerdummy.tscn" id="1_62e2m"]
+
+[sub_resource type="GDScript" id="GDScript_62e2m"]
+resource_name = "controlscript"
+script/source = "extends Control
+
+@export var OTHERPLAYERDUMMY : PackedScene
+var dummy
+
+func _ready() -> void:
+	pass
+
+#region Client
+func _on_connect_pressed() -> void:
+	var peer = ENetMultiplayerPeer.new()
+	var err = peer.create_client($IPLine.text, int($PortLine.text))
+	multiplayer.multiplayer_peer = peer
+	if err == OK:
+		FCabinet.add_log({
+			\"LOGSEVERITY\": FCabinet.LOGSEVERITY.INFO,
+			\"LOGTYPE\"    : FCabinet.LOGTYPE.MULTIPLAYERDIAGNOSTIC,
+			\"PEERID\"     : multiplayer.get_unique_id(),
+			\"EVENT\"      : \"STARTED\"
+		},FCabinet.FILENAME.MULTIPLAYERCLIENT)
+		multiplayer.connected_to_server.connect(_on_client_connected_to_server)
+		multiplayer.server_disconnected.connect(_on_client_disconnected_from_server)
+
+func _on_client_connected_to_server() -> void:
+	FCabinet.add_multi_diag_log_conn(multiplayer.get_unique_id(),FCabinet.MULTIPLAYEREVENTDIAG.CONNECTED,1,multiplayer.is_server(),FCabinet.LOGSEVERITY.INFO)
+	sendmyself()
+	$Player.movement_change.connect(_on_self_position_changed_as_client)
+	$Player.shot.connect(_on_self_shot_as_client)
+
+func _on_client_disconnected_from_server() -> void:
+	FCabinet.add_multi_diag_log_conn(multiplayer.get_unique_id(),FCabinet.MULTIPLAYEREVENTDIAG.DISCONNECTED,1,multiplayer.is_server(),FCabinet.LOGSEVERITY.INFO)
+
+func respond_to_server() -> void:
+	receive_response_from_client.rpc_id(1,\"Hello! \")
+	FCabinet.add_log({
+		\"LOGSEVERITY\": FCabinet.LOGSEVERITY.INFO,
+		\"LOGTYPE\"    : FCabinet.LOGTYPE.MULTIPLAYERIO,
+		\"PEERID\"     : multiplayer.get_unique_id(),
+		\"EVENT\"      : FCabinet.MULTIPLAYEREVENTIO.SENT,
+		\"WHAT\"       : \"Hello! \",
+		\"WHOID\"      : 1
+	},FCabinet.FILENAME.MULTIPLAYERCLIENT)
+
+func sendmyself() -> void:
+	receive_other_player_dummy.rpc_id(1, $Player.global_position)
+	FCabinet.add_log({
+		\"LOGSEVERITY\": FCabinet.LOGSEVERITY.INFO,
+		\"LOGTYPE\"    : FCabinet.LOGTYPE.MULTIPLAYERIO,
+		\"PEERID\"     : multiplayer.get_unique_id(),
+		\"EVENT\"      : FCabinet.MULTIPLAYEREVENTIO.SENT,
+		\"WHAT\"       : $Player.global_position,
+		\"WHOID\"      : 1
+	},FCabinet.FILENAME.MULTIPLAYERCLIENT)
+
+func _on_self_shot_as_client() -> void:
+	receive_client_shoot_signal.rpc_id(1)
+	FCabinet.add_log({
+		\"LOGSEVERITY\": FCabinet.LOGSEVERITY.DEBUG,
+		\"LOGTYPE\"    : FCabinet.LOGTYPE.MULTIPLAYERIO,
+		\"PEERID\"     : multiplayer.get_unique_id(),
+		\"EVENT\"      : FCabinet.MULTIPLAYEREVENTIO.SENT,
+		\"WHAT\"       : \"SHOT \",
+		\"WHOID\"      : 1
+	},FCabinet.FILENAME.MULTIPLAYERCLIENT)
+
+func _on_self_position_changed_as_client() -> void:
+	receive_other_player_position.rpc_id(1,$Player.global_position)
+	FCabinet.add_log({
+		\"LOGSEVERITY\": FCabinet.LOGSEVERITY.DEBUG,
+		\"LOGTYPE\"    : FCabinet.LOGTYPE.MULTIPLAYERIO,
+		\"PEERID\"     : multiplayer.get_unique_id(),
+		\"EVENT\"      : FCabinet.MULTIPLAYEREVENTIO.SENT,
+		\"WHAT\"       : $Player.global_position,
+		\"WHOID\"      : 1
+	},FCabinet.FILENAME.MULTIPLAYERCLIENT)
+
+@rpc(\"authority\",\"call_remote\",\"reliable\")
+func msg_from_server(msg : String) -> void:
+	FCabinet.add_log({
+		\"LOGSEVERITY\": FCabinet.LOGSEVERITY.INFO,
+		\"LOGTYPE\"    : FCabinet.LOGTYPE.MULTIPLAYERIO,
+		\"PEERID\"     : multiplayer.get_unique_id(),
+		\"EVENT\"      : FCabinet.MULTIPLAYEREVENTIO.RECEIVED,
+		\"WHAT\"       : msg,
+		\"WHOID\"      : 1
+	},FCabinet.FILENAME.MULTIPLAYERCLIENT)
+	respond_to_server()
+
+@rpc(\"authority\",\"call_remote\",\"reliable\")
+func receive_server_dummy(pos : Vector2) -> void:
+	FCabinet.add_log({
+		\"LOGSEVERITY\": FCabinet.LOGSEVERITY.INFO,
+		\"LOGTYPE\"    : FCabinet.LOGTYPE.MULTIPLAYERIO,
+		\"PEERID\"     : multiplayer.get_unique_id(),
+		\"EVENT\"      : FCabinet.MULTIPLAYEREVENTIO.RECEIVED,
+		\"WHAT\"       : position,
+		\"WHOID\"      : multiplayer.get_remote_sender_id()
+	},FCabinet.FILENAME.MULTIPLAYERCLIENT)
+	dummy = OTHERPLAYERDUMMY.instantiate()
+	self.add_child(dummy)
+	dummy.global_position = pos
+
+@rpc(\"authority\",\"call_remote\",\"unreliable_ordered\")
+func receive_server_position(pos : Vector2) -> void:
+	FCabinet.add_log({
+		\"LOGSEVERITY\": FCabinet.LOGSEVERITY.DEBUG,
+		\"LOGTYPE\"    : FCabinet.LOGTYPE.MULTIPLAYERIO,
+		\"PEERID\"     : multiplayer.get_unique_id(),
+		\"EVENT\"      : FCabinet.MULTIPLAYEREVENTIO.RECEIVED,
+		\"WHAT\"       : position,
+		\"WHOID\"      : multiplayer.get_remote_sender_id()
+	},FCabinet.FILENAME.MULTIPLAYERCLIENT)
+	dummy.global_position = pos
+
+@rpc(\"authority\",\"call_remote\",\"unreliable_ordered\")
+func receive_server_shoot_signal() -> void:
+	FCabinet.add_log({
+		\"LOGSEVERITY\": FCabinet.LOGSEVERITY.DEBUG,
+		\"LOGTYPE\"    : FCabinet.LOGTYPE.MULTIPLAYERIO,
+		\"PEERID\"     : multiplayer.get_unique_id(),
+		\"EVENT\"      : FCabinet.MULTIPLAYEREVENTIO.RECEIVED,
+		\"WHAT\"       : \"SHOT \",
+		\"WHOID\"      : multiplayer.get_remote_sender_id()
+	},FCabinet.FILENAME.MULTIPLAYERCLIENT)
+	dummy.shoot()
+#endregion
+
+#region Server
+
+var connectedpeerid : int = 0
+
+func _on_server_pressed() -> void:
+	var serverpeer = ENetMultiplayerPeer.new()
+	var err = serverpeer.create_server(int($PortLine.text))
+	multiplayer.multiplayer_peer = serverpeer
+	if err == OK:
+		FCabinet.add_log({
+			\"LOGSEVERITY\": FCabinet.LOGSEVERITY.INFO,
+			\"LOGTYPE\"    : FCabinet.LOGTYPE.MULTIPLAYERDIAGNOSTIC,
+			\"PEERID\"     : multiplayer.get_unique_id(),
+			\"EVENT\"      : \"STARTED\"
+		},FCabinet.FILENAME.MULTIPLAYERSERVER)
+		multiplayer.peer_connected.connect(_on_server_peer_connected)
+		multiplayer.peer_disconnected.connect(_on_server_peer_disconnected)
+
+func _on_server_peer_connected(id : int) -> void:
+	FCabinet.add_multi_diag_log_conn(id,FCabinet.MULTIPLAYEREVENTDIAG.CONNECTED,1,multiplayer.is_server(),FCabinet.LOGSEVERITY.INFO)
+	connectedpeerid = id
+	test_connection(id)
+	$Player.movement_change.connect(_on_self_position_changed_as_server)
+	$Player.shot.connect(_on_self_shot_as_server)
+
+func _on_server_peer_disconnected(id : int) -> void:
+	FCabinet.add_multi_diag_log_conn(id,FCabinet.MULTIPLAYEREVENTDIAG.DISCONNECTED,1,multiplayer.is_server(),FCabinet.LOGSEVERITY.INFO)
+	connectedpeerid = 0
+
+func test_connection(peerid : int) -> void:
+	msg_from_server.rpc_id(peerid,\"Hello? \")
+	FCabinet.add_log({
+		\"LOGSEVERITY\": FCabinet.LOGSEVERITY.INFO,
+		\"LOGTYPE\"    : FCabinet.LOGTYPE.MULTIPLAYERIO,
+		\"PEERID\"     : multiplayer.get_unique_id(),
+		\"EVENT\"      : FCabinet.MULTIPLAYEREVENTIO.SENT,
+		\"WHAT\"       : \"Hello? \",
+		\"WHOID\"      : peerid
+	},FCabinet.FILENAME.MULTIPLAYERSERVER)
+
+func _on_self_position_changed_as_server() -> void:
+	receive_server_position.rpc_id(connectedpeerid, $Player.global_position)
+	FCabinet.add_log({
+		\"LOGSEVERITY\": FCabinet.LOGSEVERITY.DEBUG,
+		\"LOGTYPE\"    : FCabinet.LOGTYPE.MULTIPLAYERIO,
+		\"PEERID\"     : multiplayer.get_unique_id(),
+		\"EVENT\"      : FCabinet.MULTIPLAYEREVENTIO.SENT,
+		\"WHAT\"       : $Player.global_position,
+		\"WHOID\"      : 1
+	},FCabinet.FILENAME.MULTIPLAYERSERVER)
+
+func _on_self_shot_as_server() -> void:
+	receive_server_shoot_signal.rpc_id(connectedpeerid)
+	FCabinet.add_log({
+		\"LOGSEVERITY\": FCabinet.LOGSEVERITY.DEBUG,
+		\"LOGTYPE\"    : FCabinet.LOGTYPE.MULTIPLAYERIO,
+		\"PEERID\"     : multiplayer.get_unique_id(),
+		\"EVENT\"      : FCabinet.MULTIPLAYEREVENTIO.SENT,
+		\"WHAT\"       : \"SHOT \",
+		\"WHOID\"      : connectedpeerid
+	},FCabinet.FILENAME.MULTIPLAYERSERVER)
+
+func server_sendmyself() -> void:
+	receive_server_dummy.rpc_id(connectedpeerid, $Player.global_position)
+	FCabinet.add_log({
+		\"LOGSEVERITY\": FCabinet.LOGSEVERITY.INFO,
+		\"LOGTYPE\"    : FCabinet.LOGTYPE.MULTIPLAYERIO,
+		\"PEERID\"     : multiplayer.get_unique_id(),
+		\"EVENT\"      : FCabinet.MULTIPLAYEREVENTIO.SENT,
+		\"WHAT\"       : $Player.global_position,
+		\"WHOID\"      : connectedpeerid
+	},FCabinet.FILENAME.MULTIPLAYERSERVER)
+
+@rpc(\"any_peer\",\"call_remote\",\"reliable\")
+func receive_response_from_client(msg : String) -> void:
+	FCabinet.add_log({
+		\"LOGSEVERITY\": FCabinet.LOGSEVERITY.INFO,
+		\"LOGTYPE\"    : FCabinet.LOGTYPE.MULTIPLAYERIO,
+		\"PEERID\"     : multiplayer.get_unique_id(),
+		\"EVENT\"      : FCabinet.MULTIPLAYEREVENTIO.RECEIVED,
+		\"WHAT\"       : msg,
+		\"WHOID\"      : multiplayer.get_remote_sender_id()
+	},FCabinet.FILENAME.MULTIPLAYERSERVER)
+
+@rpc(\"any_peer\",\"call_remote\",\"reliable\")
+func receive_other_player_dummy(pos : Vector2) -> void:
+	FCabinet.add_log({
+		\"LOGSEVERITY\": FCabinet.LOGSEVERITY.INFO,
+		\"LOGTYPE\"    : FCabinet.LOGTYPE.MULTIPLAYERIO,
+		\"PEERID\"     : multiplayer.get_unique_id(),
+		\"EVENT\"      : FCabinet.MULTIPLAYEREVENTIO.RECEIVED,
+		\"WHAT\"       : position,
+		\"WHOID\"      : multiplayer.get_remote_sender_id()
+	},FCabinet.FILENAME.MULTIPLAYERSERVER)
+	dummy = OTHERPLAYERDUMMY.instantiate()
+	self.add_child(dummy)
+	dummy.global_position = pos
+	server_sendmyself()
+
+@rpc(\"any_peer\",\"call_local\",\"unreliable_ordered\")
+func receive_other_player_position(pos: Vector2) -> void:
+	FCabinet.add_log({
+		\"LOGSEVERITY\": FCabinet.LOGSEVERITY.DEBUG,
+		\"LOGTYPE\"    : FCabinet.LOGTYPE.MULTIPLAYERIO,
+		\"PEERID\"     : multiplayer.get_unique_id(),
+		\"EVENT\"      : FCabinet.MULTIPLAYEREVENTIO.RECEIVED,
+		\"WHAT\"       : position,
+		\"WHOID\"      : multiplayer.get_remote_sender_id()
+	},FCabinet.FILENAME.MULTIPLAYERSERVER)
+	dummy.global_position = pos
+
+@rpc(\"any_peer\",\"call_remote\",\"unreliable_ordered\")
+func receive_client_shoot_signal() -> void:
+	FCabinet.add_log({
+		\"LOGSEVERITY\": FCabinet.LOGSEVERITY.DEBUG,
+		\"LOGTYPE\"    : FCabinet.LOGTYPE.MULTIPLAYERIO,
+		\"PEERID\"     : multiplayer.get_unique_id(),
+		\"EVENT\"      : FCabinet.MULTIPLAYEREVENTIO.RECEIVED,
+		\"WHAT\"       : \"SHOT \",
+		\"WHOID\"      : multiplayer.get_remote_sender_id()
+	},FCabinet.FILENAME.MULTIPLAYERSERVER)
+	dummy.shoot()
+#endregion
+"
+
+[node name="Control" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -1.0
+offset_right = -1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = SubResource("GDScript_62e2m")
+OTHERPLAYERDUMMY = ExtResource("1_62e2m")
+
+[node name="connect" type="Button" parent="."]
+layout_mode = 0
+offset_left = 892.0
+offset_top = 292.0
+offset_right = 900.0
+offset_bottom = 300.0
+text = "connect"
+
+[node name="server" type="Button" parent="."]
+layout_mode = 0
+offset_left = 895.0
+offset_top = 335.0
+offset_right = 954.0
+offset_bottom = 366.0
+text = "server"
+
+[node name="Player" parent="." instance=ExtResource("1_0fbet")]
+z_index = 1
+position = Vector2(242, 245)
+
+[node name="IPLine" type="LineEdit" parent="."]
+layout_mode = 0
+offset_left = 880.0
+offset_top = 193.0
+offset_right = 948.563
+offset_bottom = 224.0
+
+[node name="PortLine" type="LineEdit" parent="."]
+layout_mode = 0
+offset_left = 881.0
+offset_top = 239.0
+offset_right = 949.563
+offset_bottom = 270.0
+text = "50000"
+
+[connection signal="pressed" from="connect" to="." method="_on_connect_pressed"]
+[connection signal="pressed" from="server" to="." method="_on_server_pressed"]

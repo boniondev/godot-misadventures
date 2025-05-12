@@ -1,0 +1,26 @@
+[gd_scene load_steps=4 format=3 uid="uid://fdodxa6ptw0p"]
+
+[ext_resource type="PackedScene" uid="uid://dsf5owtkvue8q" path="res://bullet.tscn" id="1_3wj5l"]
+[ext_resource type="Texture2D" uid="uid://gmtw3l687hfy" path="res://icon.svg" id="1_n7tij"]
+
+[sub_resource type="GDScript" id="GDScript_n7tij"]
+resource_name = "dummylogic"
+script/source = "extends CharacterBody2D
+
+@export var BULLET : PackedScene
+
+func shoot() -> void:
+	var newbullet = BULLET.instantiate()
+	newbullet.init(self.transform, self.global_position)
+	self.get_parent().add_child(newbullet)
+"
+
+[node name="Playerdummy" type="CharacterBody2D"]
+rotation = -1.5708
+motion_mode = 1
+script = SubResource("GDScript_n7tij")
+BULLET = ExtResource("1_3wj5l")
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+scale = Vector2(0.25, 0.25)
+texture = ExtResource("1_n7tij")
